@@ -171,7 +171,7 @@ En attente de chargement des noms des cantiques[/color]"
     #  (we need it for unicode chars)
     font = "DejaVuSansCondensed.ttf"
     
-    #List of availabled songs
+    #List of availabled songs by lang
     songs = {}
 
     #The 3 songs we will use on the meeting
@@ -203,33 +203,36 @@ En attente de chargement des noms des cantiques[/color]"
 
         self.init_finished = True
             
-    def _dl_song_list(self, request, result, newsongs=True):
-        """Downloag songs list from Jw.org."""
+    def _parse_songs_list(self, request, result, newsongs=True):
+        """Parse songs list downloaded from Jw.org."""
         parser = KyHtmlParser(result)
         parser.findall_attr({"class": "linkDnld"}).gettext()
         mp3_links = parser.parse()
         
-        songs = ""
-        
+        songs = ""        
         for link in mp3_links:
             if " " in link:
                 number, title = link.split(" ", 1)
                 number = number[:3]
                 if number.isdigit():
                     songs = songs + number + " " + title + "\n"
+
         if newsongs:
-            self._update_song_names(songs)
+            self._save_song_names(songs)
         else:
-            self._update_song_names(None, songs)
+            self._save_song_names(None, songs)
         self.update_songs(False)
+
+    def _url_request_failed(self, request, result):
+        self._update_song_names()
 
     def _set_infos(self, colors, sing):
         """Display informations about the current song."""
         if not sing:
             return
         
-        if sing in self.songs:
-            title = self.songs[sing]
+        if self.lang in self.songs and sing in self.songs[self.lang]:
+            title = self.songs[self.lang][sing]
         else:
             title = self.SONG_NAME_NOT_FOUND
 
@@ -240,6 +243,37 @@ En attente de chargement des noms des cantiques[/color]"
         self.infos = (
             u"[font=data/fonts/"+self.font+"]"+text+u"[/font]"
             )
+
+    def _save_song_names(self, newsongs="", firstsongs=""):
+        """Update song names from Wol using lang of congregation."""
+        songs = firstsongs
+        if not firstsongs:
+            if os.path.isfile(self.save_path+"135_songs_"+self.lang+".lst"):
+                songs = open(self.save_path+"135_songs_"+self.lang+".lst",
+                    "rb").read().decode("utf-8")
+        else:
+            open(self.save_path+"135_songs_"+self.lang+".lst",
+                "wb").write(firstsongs.encode("utf-8"))
+        
+        if not newsongs:
+            if os.path.isfile(self.save_path+"new_songs_"+self.lang+".lst"):
+                songs = songs + open(self.save_path+"new_songs_"+self.lang+".lst",
+                    "rb").read().decode("utf-8")
+        else:
+            open(self.save_path+"new_songs_"+self.lang+".lst",
+                "wb").write(newsongs.encode("utf-8"))
+            songs = songs + newsongs
+        
+        if songs:
+            if not self.lang in self.songs:
+                self.songs[self.lang] = {}
+            for song in songs.split("\n"):
+                if song:
+                    number, title = song.split(" ", 1)
+                    self.songs[self.lang][number] = title
+        
+        if self.loaded_songs_infos:
+            self.infos = self.loaded_songs_infos
 
     def update_songs(self, update_names=True):
         """Update song names and current sing with new lang."""
@@ -262,51 +296,17 @@ En attente de chargement des noms des cantiques[/color]"
     def update_song_names(self):
         """Start updating of song names (first time, dl from jw.org)."""
         self.update_lang_and_font()
-        if not self.songs: # Only dl first time
+        if not self.lang in self.songs or not self.songs[self.lang]: # Only dl first time
             self._url_request(
                 self.JW_A136_MP3+self.lang,
-                lambda req, res: self._dl_song_list(req, res, True),
+                lambda req, res: self._parse_songs_list(req, res, True),
                 self._url_request_failed)
             self._url_request(
                 self.JW_1TO135_MP3+self.lang,
-                lambda req, res: self._dl_song_list(req, res, False),
+                lambda req, res: self._parse_songs_list(req, res, False),
                 self._url_request_failed)
         else:
-            self._update_song_names()
-    
-    def _url_request_failed(self, request, result):
-        self._update_song_names()
-        
-    
-    def _update_song_names(self, newsongs="", firstsongs=""):
-        """Update song names from Wol using lang of congregation."""
-        songs = firstsongs
-        if not firstsongs:
-            if os.path.isfile(self.save_path+"135_songs_"+self.lang+".lst"):
-                songs = open(self.save_path+"135_songs_"+self.lang+".lst",
-                    "rb").read().decode("utf-8")
-        else:
-            print(self.save_path+"135_songs_"+self.lang+".lst")
-            open(self.save_path+"135_songs_"+self.lang+".lst",
-                "wb").write(firstsongs.encode("utf-8"))
-        
-        if not newsongs:
-            if os.path.isfile(self.save_path+"new_songs_"+self.lang+".lst"):
-                songs = songs + open(self.save_path+"new_songs_"+self.lang+".lst",
-                    "rb").read().decode("utf-8")
-        else:
-            open(self.save_path+"new_songs_"+self.lang+".lst",
-                "wb").write(newsongs.encode("utf-8"))
-            songs = songs + newsongs
-        
-        if songs:
-            for song in songs.split("\n"):
-                if song:
-                    number, title = song.split(" ", 1)
-                    self.songs[number] = title
-        
-        if self.loaded_songs_infos:
-            self.infos = self.loaded_songs_infos
+            self._save_song_names()
 
     def get_name_of_song_number(self, number, check_mp3=True):
         """Get the name of a song by the number."""
@@ -321,10 +321,10 @@ En attente de chargement des noms des cantiques[/color]"
         except:
             return default
 
-        if self.songs:
-            if not num in self.songs:
+        if self.songs and self.lang in self.songs:
+            if not num in self.songs[self.lang]:
                 return default
-            song_title = self.songs[num]
+            song_title = self.songs[self.lang][num]
         else:
             song_title = self.SONG_NAME_NOT_FOUND
         
