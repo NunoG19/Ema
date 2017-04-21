@@ -1,0 +1,82 @@
+#:kivy 1.0
+
+Popup:
+    title: ""
+    size_hint: None, None
+    size: 500, 350
+    
+    BoxLayout:
+        orientation: "vertical"
+        canvas.after:
+            Color:
+                rgba: 0, 0, 0, root.background_color[0]
+            Rectangle:
+                size: self.size[0], self.size[1]-40
+                pos: self.pos
+                
+        Spinner:
+            id: select_number
+            background_down: 'atlas://data/images/defaulttheme/spinner'
+            font_size: "14pt"
+            size_hint_y: None
+            height: 40
+        
+        Label:
+            id: select_text
+            size_hint_y: 0.2
+            font_size: "10pt"
+            text: ""
+            markup: True
+                
+        GridLayout:
+            cols: 3
+            
+            Button:
+                id: n7
+                text: "7"
+            
+            Button:
+                id: n8
+                text: "8"
+            
+            Button:
+                id: n9
+                text: "9"
+            
+            Button:
+                id: n4
+                text: "4"
+            
+            Button:
+                id: n5
+                text: "5"
+            
+            Button:
+                id: n6
+                text: "6"
+            
+            Button:
+                id: n1
+                text: "1"
+            
+            Button:
+                id: n2
+                text: "2"
+            
+            Button:
+                id: n3
+                text: "3"
+            
+            Button:
+                id: nDel
+                background_color: Color("#FFC0CB")
+                text: "Effac."
+
+            Button:
+                id: n0
+                text: "0"
+
+            Button:
+                id: nOk
+                background_color: Color("#B5FFB5")
+                text: "Ok"

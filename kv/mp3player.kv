@@ -1,0 +1,140 @@
+#:kivy 1.0
+#: import Color kivy.utils.get_color_from_hex
+
+<SelectSing>
+    orientation: "horizontal"
+    size_hint_y: None
+    padding: 2
+    spacing: 2
+    height: 30
+    
+    Image:
+        id: sing_image
+        size_hint_x: None
+        width: 32
+        source: root.initial_image
+        disabled: True
+    SongInput:
+        id: sing_input
+        on_text_validate: root.player.validate_song_number(sing_label, root.slot, self.text, sing_image)
+        size_hint_x: None
+        width: 40
+        multiline: False
+    Label:
+        id: sing_label
+        font_size: "13sp"
+        text_size: self.size
+        halign: "left"
+        valign: "middle"
+        markup: True
+
+
+<Mp3Player>:
+    orientation: "vertical"
+    size_hint_y: None
+    height: 250
+    
+    BoxLayout:
+        orientation: "vertical"
+        padding: 5
+        size_hint_y: None
+        height: 50
+        Label:
+            text: root.infos
+            font_size: "13sp"
+            halign: "center"
+            text_size: self.size
+            markup: True
+        ProgressBar:
+            value: root.progress
+            max: root.max_progress
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: 2
+        spacing: 2
+        size_hint_y: None
+        height: 200
+        canvas.before:
+            Color:
+                rgb: Color("#2C3440")
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: 5, 5, 5, 5
+                
+        Label:
+            font_size: "13sp"
+            text: "[b][color=#ffffff]Cantiques à lancer durant la réunion [/color][/b]"
+            markup: True
+
+        SelectSing:
+            id: sing1
+            slot: 0
+            player: root
+            initial_image: "data/images/bullet_go.png"
+        
+        SelectSing:
+            id: sing2
+            slot: 1
+            player: root
+            initial_image: "atlas://data/images/defaulttheme/action_item"
+
+        SelectSing:
+            id: sing3
+            slot: 2
+            player: root
+            initial_image: "atlas://data/images/defaulttheme/action_item"
+
+                
+        BoxLayout:
+            size_hint_y: None
+            height: 40
+            orientation: "horizontal"
+            padding: 2
+            Button:
+                size_hint_x: .2
+                on_press: root.play_sing()
+                on_press: pause_icon.source = "data/images/control_pause.png"
+                on_press: play_icon.source = "data/images/control_play_blue.png"
+                Image:
+                    id: play_icon
+                    source: "data/images/control_play_blue.png"
+                    size: self.parent.size
+                    pos: self.parent.pos
+            Button
+                size_hint_x: .2
+                on_press: root.pause()
+                on_press: pause_icon.source = "data/images/control_pause_blue.png"
+                on_press: play_icon.source = "data/images/control_play.png"
+                Image:
+                    id: pause_icon
+                    source: "data/images/control_pause.png"
+                    size: self.parent.size
+                    pos: self.parent.pos
+            Button:
+                size_hint_x: .2
+                on_press: root.stop()
+                on_press: play_icon.source = "data/images/control_play.png"
+                Image:
+                    source: "data/images/control_stop.png"
+                    size: self.parent.size
+                    pos: self.parent.pos
+            Button:
+                size_hint_x: .2
+                on_press: root.next_slot_sing()
+                Image:
+                    source: "data/images/control_fastforward.png"
+                    size: self.parent.size
+                    pos: self.parent.pos
+
+        BoxLayout:
+            padding: 2
+            size_hint_y: None
+            height: 40
+            Button:
+                background_color: .7, .7, 1, 1
+                text: "Ambiance"
+                on_press: root.play_random()
+                on_press: play_icon.source = "data/images/control_play_blue.png"
+

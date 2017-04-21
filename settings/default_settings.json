@@ -1,0 +1,12 @@
+{
+"main":
+    {
+        "use_elya": false,
+        "use_mp3": true,
+        "use_meetinginfos": true
+    },
+"mp3":
+    {
+        "songs_path": "~/Music/Cantiques"
+    }
+}

@@ -1,0 +1,39 @@
+<MeetingInfos>:
+    orientation: "vertical"
+    spacing: 2
+    
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: None
+        height: 40
+
+        Button:
+            on_press: root.prev_part()
+            size_hint: None, None
+            size: 40, 40
+            text: u"[font=data/fonts/ema.ttf]\uE80A[/font]"
+            markup: True
+
+        Label:
+            text: "" #root.offset
+            font_size: "30sp"
+            markup: True
+        
+        Button:
+            on_press: root.next_part()
+            size_hint: None, None
+            size: 40, 40
+            text: u"[font=data/fonts/ema.ttf]\uE809[/font]"
+            markup: True
+
+    BoxLayout:
+        orientation: "horizontal"
+        padding: 5
+        Label:
+            text: root.parts
+            halign: "left"
+            valign: "top"
+            text_size: self.width, self.height
+            size: self.texture_size
+            font_size: "14sp"
+            markup: True

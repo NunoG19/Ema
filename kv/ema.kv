@@ -1,0 +1,72 @@
+#:kivy 1.0
+#: import Color kivy.utils.get_color_from_hex
+#: include kv/mp3player.kv
+#: include kv/meetinginfos.kv
+#: include kv/elya.kv
+
+<SettingText>
+    Label:
+        text: "..."
+        pos: root.pos
+        font_size: "15sp"
+
+<EmaUi>:
+    
+    KyModule:
+        id: kym
+        orientation: "vertical"
+
+        ActionBar:
+            pos_hint: {"top": 1}
+            ActionView:
+                use_separator: False
+                ActionPrevious:
+                    app_icon: "data/images/logo.png"
+                    app_icon_width: 104
+                    title: "v" + root.version + " : Il y a salut dans la multitude des conseillers"
+                    with_previous: False
+                ActionButton:
+                    text: root.time
+                    color: Color("#40D940")
+                    font_size: "30sp"
+                    font_name: "data/fonts/lcd.ttf"
+                    markup: True
+                ActionGroup:
+                    id: congregations
+                    size_hint_x: None
+                    mode: "spinner"
+
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+            spacing: 5
+                        
+            BoxLayout:
+                orientation: "vertical"
+                spacing: 2
+
+                MeetingInfos:
+                    id: meetinginfos
+                    
+            BoxLayout:
+                orientation: "vertical"
+                spacing: 5
+                padding: 5
+                Mp3Player:
+                    id: mp3player
+                Elya:
+                    id: elya
+                
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: "horizontal"
+            Label:
+                text: root.status
+                font_size: "10sp"
+
+
+            #Button:
+            #   text: "Phone on/off"
+            #   on_press: root.phone.switch_mute()

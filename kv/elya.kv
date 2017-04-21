@@ -1,0 +1,55 @@
+<Elya>:
+    canvas.before:
+        Color:
+            rgb: 0.1, 0.1, 0.1
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: 5, 5, 5, 5
+    orientation: "vertical"
+            
+    BoxLayout: #Linphone module
+        orientation: "horizontal"
+        size_hint_y: None
+        height: 40
+        padding: 5
+        
+        canvas.before:
+            Color:
+                rgb: 0.05, 0.2, 0.35
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        Image:
+            size_hint_x: None
+            width: 40
+            source: root.bullet_status
+            
+        Label:
+            text: "Conférence - Nombre de Participants : "
+            size_hint_x: None
+            width: self.texture_size[0]
+            
+        Label:
+            text: root.total_users
+            markup: True
+            size_hint_x: None
+            width: self.texture_size[0]
+        
+        Widget:
+            
+        Button:
+            text: "Appeler"
+            size_hint_x: None
+            text_size: self.size
+            halign: "center"
+            valign: "middle"
+            on_press: root.compose_number()
+
+    Label:
+        halign: "left"
+        valign: "top"
+        text_size: self.size
+        padding: 5, 10
+        text: root.users
+        markup: True
