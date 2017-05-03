@@ -276,8 +276,9 @@ class MeetingInfos(KyModule):
     def update_time(self, *args):
         """Update timing fo meeting."""
         t = datetime.today()
-       # t = datetime.strptime("2016/10/18 19:56", "%Y/%m/%d %H:%M")
+        #t = datetime.strptime("2016/10/18 19:56", "%Y/%m/%d %H:%M")
         self.time = t.strftime("%H:%M[size=20]%S[/size]")
+
         return
         
         #### TODO #####
