@@ -41,6 +41,7 @@ from kivy.app import App
 from kivy.logger import Logger
 from kivy.uix.settings import Settings
 from kivy.uix.boxlayout import BoxLayout
+from ConfigParser import NoOptionError
 
 from kyurlrequest import KyUrlRequest
 
@@ -86,9 +87,23 @@ class KyModule(BoxLayout):
         if not key:
             key = section
             section = KyModule.congregation
-        value = self.config.get(section, key)
+        try:
+            value = self.config.get(section, key)
+        except NoOptionError:
+            return ""
         Logger.info("Config: %s:%s = %r" % (section, key, value))
         return value.encode("utf-8")
+
+    def set_config(self, value, section="", key=""):
+        """Save config value
+        if no key => congregation:key
+        if section and key =>section:key."""
+        if not key:
+            key = section
+            section = KyModule.congregation
+        value = self.config.set(section, key, value.decode("utf-8"))
+        Logger.info("SET Config: %s:%s = %r" % (section, key, value))
+        self.config.write()
 
     def update_lang_and_font(self):
         """Update language and font used by the app."""

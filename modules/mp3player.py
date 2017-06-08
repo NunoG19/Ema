@@ -434,6 +434,8 @@ En attente de chargement des noms des cantiques[/color]"
 
         songs = deque(files)
         song_number = songs.popleft()
+        if not song_number.isdigit():
+            return
         mp3 = None
         for mp3 in glob.glob(
             self.MP3PATH+"/*%.03d.mp3" % int(song_number)):

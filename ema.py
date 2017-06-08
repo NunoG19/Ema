@@ -29,17 +29,18 @@ except:
     pass
 
 import kivy
-kivy.require('1.0.6')
+kivy.require("1.0.6")
 
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.logger import Logger
 from kivy.config import Config
-Config.set('graphics', 'width', '1024')
-Config.set('graphics', 'height', '768')
-Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
+Config.set("graphics", "width", "1024")
+Config.set("graphics", "height", "768")
+Config.set("input", "mouse", "mouse,multitouch_on_demand")
 
 from kivy.event import EventDispatcher
+from kivy.core.window import Window
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.actionbar import ActionButton
@@ -52,7 +53,6 @@ from modules.elya import Elya
 
 from libs.kyapp import KyApp, KyModule
 import version
-
 
 class EmaUi(FloatLayout):
     """
@@ -94,7 +94,7 @@ class EmaApp(KyApp):
         super(EmaApp, self).build_settings(settings)
         settings.add_json_panel('Général', self.config,
                                 'settings/main.json')
-
+        
     def connect_widgets(self):
         """Connect widgets of modules (like MeetingInfos with Mp3Player)."""
         Logger.info("Ema: Binding modules...")
@@ -120,7 +120,6 @@ class EmaApp(KyApp):
                 self.mp3player.ids["sing3"].ids["sing_input"]
         else:
             self.meetinginfos = kyModule()
-
 
     def on_select_congregation(self, button):
         """Update widgets when user change the congregation."""
@@ -171,7 +170,8 @@ class EmaApp(KyApp):
         
         #Clock.schedule_once(
         #    lambda dt: self.elya.connect_sip_account(), 1)
-        
+
+        self.elya.load_contacts()
         #self.elya.connect_ovh_account()
         #self.elya.clean_conference()
         
@@ -181,3 +181,4 @@ class EmaApp(KyApp):
 
 if __name__ == '__main__':
     EmaApp().run()
+

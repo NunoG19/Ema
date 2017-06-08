@@ -20,6 +20,7 @@
 
 from __future__ import print_function
 
+import os
 import json
 import time
 import base64
@@ -40,7 +41,8 @@ from libs.ovh_account import OvhAccount
 
 class Elya(KyModule):
     kv_directory = "kv"
-    
+
+    pass_bind = False
     status = StringProperty("")
     bullet_status = StringProperty("data/images/bullet_red.png")
     users = StringProperty("")
@@ -54,9 +56,26 @@ class Elya(KyModule):
     
     gain = -30.0
     
-    callers = {
-        "0629221202": u"Frère Nuno Gonçalves",
-    }
+    callers = {}
+
+    def load_contacts(self):
+        contacts = ""
+        filename = self.save_path+os.sep+"contacts.txt"
+        if os.path.isfile(filename):
+            contacts = open(filename, "rb").read().split("\n")
+            for contact in contacts:
+                if contact:
+                    c = contact.split(":")
+                    if len(c) == 2:
+                        self.callers[c[0].strip()] = c[1].strip().decode("utf-8")
+
+
+    def save_contacts(self):
+        filename = self.save_path+os.sep+"contacts.txt"
+        contacts = []
+        for num, name in self.callers.items():
+            contacts.append(self._clean_number(num)+" : "+name.encode("utf-8"))
+        open(filename, "wb").write("\n".join(contacts))
     
     def connect_sip_account(self):
         """Connect sip account and auto_call if need."""
@@ -118,15 +137,21 @@ class Elya(KyModule):
                         self.get_caller_name(user["Caller-ID-Name"]))
 
     def compose_number(self, *args):
-        self.popup = popup = Builder.load_file('kv/numpad.kv')
+        self.reset_message_event = None
+        self.popup = popup = Builder.load_file('kv/phonepad.kv')
         popup.title = "Numéro de téléphone (Fixe seulement)"
         self.select_number = popup.ids["select_number"]
-        self.select_text = self.popup.ids["select_text"]
+        self.status_message = popup.ids["status_message"]
+        self.contact_name = self.popup.ids["contact_name"]
+        self.popup.ids["save_contact"].bind(on_press = self.save_contact_name)
         numbers = []
         for number, caller  in self.callers.items():
-            numbers.append(self._phonerize(number)+" :  "+caller)
+            numbers.append(self._phonerize(number))
         self.select_number.values = numbers
-        #~ self.select_number.bind(on_press = self.spinner_to_darkness)
+        self.select_number.bind(text = self._update_name)
+        self.select_number._dropdown.bind(
+             on_dismiss = lambda x: self._update_name(x, self.select_number.text))
+        
         #~ self.select_number._dropdown.bind(
             #~ on_dismiss = self.spinner_to_lightness)
         #~ self.select_number.bind(
@@ -143,9 +168,43 @@ class Elya(KyModule):
         b.bind(on_press = self.ok_pressed)
         popup.open()
 
-    def _clean_number(self, num):
-        if ":" in num:
-            num = num.split(":")[0]
+    def _update_name(self, instance, number):
+        num, name = self._get_num_and_name(number)
+        self.contact_name.text = name
+
+    def _reset_status_message(self, dt):
+         self.status_message.text = ""
+        
+    def save_contact_name(self, x):
+        num, name = self._get_num_and_name(self.select_number.text)
+        if len(num) != 15:
+            self.status_message.text = "Numéro de téléphone invalide"
+            if self.reset_message_event:
+                Clock.unschedule(self.reset_message_event)
+            self.reset_message_event = Clock.schedule_once(self._reset_status_message, 1)
+            return
+        name = self.contact_name.text
+        if name:
+            self.callers[self._clean_number(num)] = name
+        elif self._clean_number(num) in self.callers:
+            del(self.callers[self._clean_number(num)])
+        numbers = []
+        for number, caller  in self.callers.items():
+            numbers.append(self._phonerize(number))
+        self.select_number.values = numbers
+        self.save_contacts()
+        self.update_phone_number(num+" : "+name)
+
+    def _get_num_and_name(self, number):
+        if " : " in number:
+            num, name = number.split(" : ")
+        else:
+            num = number
+            name = ""
+        return num, name
+
+    def _clean_number(self, number):
+        num, name = self._get_num_and_name(number)
         return num.replace(" ", "")
 
     def _phonerize(self, num):
@@ -166,39 +225,41 @@ class Elya(KyModule):
             if i == 2:
                 i = 0
                 final = final + " "
-        return final
+        return self.get_caller_name(final)
+        
 
     def keynum_pressed(self, button):
         num = self._phonerize(self.select_number.text + button.text)
-        if len(num) <= 15:
-            self.select_number.text = self.get_caller_name(num)
-        
+        print(num)
+        if len(num) <= 15 or " : " in num:
+            self.update_phone_number(num)
 
     def del_pressed(self, button):
-        num = self._phonerize(self.select_number.text)
-        if num[-1] != " ":
-            self.select_number.text = num[:-1]
-        else:
-            self.select_number.text = num[:-2]
+        num = self._clean_number(self.select_number.text)[:-1]
+        print(num)
+        self.update_phone_number(num)
 
     def ok_pressed(self, button):
         self.popup.dismiss()
-        num = self.select_number.text
-        if ":" in num:
-            num, name = num.split(":")
-        else:
-            name = num
-        
+        number = self.select_number.text
+        num, name = self._get_num_and_name(number)
         self.sip_account.call(name, num.replace(" ", ""))
 
     def get_caller_name(self, caller_id):
         """Return name associated to number"""
-
         cid = caller_id.replace(" ", "")
+        print(self.callers)
         if cid in self.callers:
+            self.contact_name.text = self.callers[cid]
             return caller_id+" : "+self.callers[cid]
         else:
             return caller_id
+
+    def update_phone_number(self, number):
+        """Update number and contact name"""
+        num, name = self._get_num_and_name(number)
+        self.select_number.text = self._phonerize(num)
+        self.contact_name.text = name
     
     def clean_conference(self):
         """Kick any call from pc"""
@@ -267,351 +328,3 @@ class Elya(KyModule):
     def quit(self):
         """Ask sip account to terminate all calls."""
         self.sip_account.quit()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    #~ def connect_ovh(self):
-        #~ # http://www.ovh.com/cgi-bin/telephony/webconf.pl?token=756978792c123dc0b3fc89afe0c866150a83aa36&action
-        #~ self.ovh_client = ovh.Client(
-            #~ endpoint="ovh-eu",
-            #~ application_key="oOVVC9hyUlzO5ws9",
-            #~ application_secret="7ijntRlikmr09oTReoZ3yElVHATVM48o",
-            #~ consumer_key="D8UJY0WPxdeAZVtbbA9j4ZvROIDCpEVZ",
-        #~ )
-        
-    #~ def get_ovh_filled_request(self, request):
-        #~ return request.replace("{billingAccount}", "gj248003-ovh-1").replace("{serviceName}", "0033972584648")
-
-    #~ def pre_setup_ovh_conference(self):
-        #~ try:
-            #~ result = self.ovh_client.put(self.get_ovh_filled_request("/telephony/{billingAccount}/conference/{serviceName}/settings"), 
-                #~ recordStatus=False,
-                #~ anonymousRejection=True,
-                #~ enterMuted=False,
-            #~ )
-        #~ except Exception, e:
-             #~ Logger.warning("Elya: Erreur dans pre_setup_ovh_conference : %s", e)
-        
-    #~ def setup_ovh_conference(self):
-        #~ try:
-            #~ result = self.ovh_client.put(self.get_ovh_filled_request("/telephony/{billingAccount}/conference/{serviceName}/settings"), 
-                #~ enterMuted=True,
-            #~ )
-        #~ except:
-            #~ return
-        #~ print "SETUP:",json.dumps(result, indent=4)
-
-    #~ def kick_from_ovh_conference(self, uid):
-        #~ try:
-            #~ response = urllib2.urlopen(
-                #~ "http://www.ovh.com/cgi-bin/telephony/webconf.pl?token=756978792c123dc0b3fc89afe0c866150a83aa36&action=kick&memberid=%s" % uid,
-                #~ timeout=3).read(10000)
-        #~ except Exception, e:
-             #~ Logger.warning("Elya: Erreur dans _get_ovh_conference_infos : %s", e)
-        #~ return
-        
-        
-        #~ try:
-            #~ result = self.ovh_client.post(self.get_ovh_filled_request("/telephony/{billingAccount}/conference/{serviceName}/participants/"+uid+"/kick"))
-        #~ except Exception, e:
-            #~ Logger.warning("Elya: Erreur dans kick_from_ovh_conference : %s", e)
-            #~ return
-        #~ print "KICK:",json.dumps(result, indent=4)
-
-    #~ def _get_ovh_conference_infos(self):
-        #~ try:
-            #~ response = urllib2.urlopen(
-                #~ "http://www.ovh.com/cgi-bin/telephony/webconf.pl?token=756978792c123dc0b3fc89afe0c866150a83aa36&action",
-                #~ timeout=3).read(10000)
-        #~ except Exception, e:
-            #~ Logger.warning("Elya: Erreur dans _get_ovh_conference_infos : %s", e)
-            #~ return False
-        
-        #~ infos = json.loads(response)
-        #~ print infos
-        #~ return infos
-    
-    #~ def get_caller_name(self, caller_id):
-        #~ callers = {
-            #~ "0629221202": u"Frère Nuno Gonçalves",
-        #~ }
-        #~ cid = caller_id.replace(" ", "")
-        #~ if cid in callers:
-            #~ return caller_id+" : "+callers[cid]
-        #~ else:
-            #~ return caller_id
-    
-    #~ def get_ovh_conference_infos(self, *args):
-        #~ infos = self._get_ovh_conference_infos()
-        #~ time.sleep(3)
-        #~ if not infos:
-            #~ return
-            
-        #~ if infos["msg"]:
-            #~ self.users.text = infos["msg"]
-            #~ return
-        
-        #~ self.users_list = []
-        #~ if "Members" in infos["value"]:
-            #~ for user in infos["value"]["Members"]:
-                #~ if user["Caller-ID-Name"] == "09 72 58 44 91":
-                    #~ self.users_list.insert(
-                        #~ 0,
-                        #~ u"PC Salle")
-                #~ else:
-                    #~ self.users_list.append(
-                        #~ self.get_caller_name(user["Caller-ID-Name"]))
-
-    #~ def connect(self, *args):
-        #~ self.connect_ovh()
-        #~ infos = self._get_ovh_conference_infos()
-        #~ if infos:
-            #~ if "Members" in infos["value"]:
-                #~ for user in infos["value"]["Members"]:
-                    #~ print "///////////// Ema here !!!"
-                    #~ if user["Caller-ID-Name"] == "09 72 58 44 91":
-                        #~ #Kick Ema from conf
-                        #~ self.kick_from_ovh_conference(user["ID"])
-                        
-            #~ Logger.info("OVH: "+str(infos))
-
-        #~ self.pre_setup_ovh_conference()
-        #~ #self.users.adapter = SimpleListAdapter(data=[], cls=Label)
-        #~ callbacks = {
-            #~ 'global_state_changed': self.global_state_changed,
-            #~ 'registration_state_changed': self.registration_state_changed,
-            #~ 'call_state_changed' :  self.call_state_changed,
-        #~ }
-        #~ self.core = linphone.Core.new(callbacks, None, None)
-        #~ proxy_cfg = self.core.create_proxy_config()
-        #~ proxy_cfg.identity_address = self.core.create_address("sip:0033972584491@sip3.ovh.fr")
-        #~ proxy_cfg.server_addr = "sip:sip3.ovh.fr"
-        #~ proxy_cfg.register_enabled = True
-        #~ self.proxy_cfg = proxy_cfg
-        #~ self.core.add_proxy_config(proxy_cfg)
-        #~ auth_info = linphone.AuthInfo.new("0033972584491", None, "FlkoSV9s", None, None, "sip3.ovh.fr")
-        #~ self.core.add_auth_info(auth_info)
-        #~ self.core.playback_gain_db =  self.gain
-        #~ Clock.schedule_once(lambda dt:  self.start(), 1)
-       
-
-    #~ def global_state_changed(self, *args):
-        #~ self.log("Elya/Global: %d) %s" % (args[1], args[2]))
-
-    #~ def _call(self):
-        #~ if self.core.calls_nb == 0:
-            #~ self.call = self.core.invite(
-                #~ "sip:0033972584648@sip3.ovh.fr")
-            #~ self.call.user_data = u"PC Salle"
-
-    #~ def registration_state_changed(self, core, call, state, message):
-        #~ self.log("Elya/Regist.: %s) %s" % (state, message))
-        #~ if state == linphone.RegistrationState.Progress:
-            #~ self.set_bullet_status("progress")
-        #~ elif state == linphone.RegistrationState.Ok:
-            #~ self.core.terminate_all_calls()
-            #~ self.set_bullet_status("ok")
-            #~ self._call()
-            #~ Clock.schedule_once(lambda dt:  self._call(), 10)
-        #~ elif state == linphone.RegistrationState.Failed:
-            #~ self.set_bullet_status("ko")
-    
-    #~ def call_state_changed(self, core, call, state, message):
-        #~ self.log(
-            #~ "Elya/Call: %s) %s" % (state, message))
-        #~ if message == "LinphoneCallStreamsRunning":
-            #~ self.get_ovh_conference_infos()
-            #~ self.setup_ovh_conference()
-        #~ elif self.do_recall and (state == linphone.CallState.Error
-            #~ or
-            #~ state == linphone.CallState.End):
-                #~ self.quit()
-                #~ self.pre_setup_ovh_conference()
-                #~ Clock.schedule_once(lambda dt:  self._call(), 1)
-
-    #~ def set_bullet_status(self, status):
-        #~ if status == "ok":
-            #~ self.bullet_status = "data/images/bullet_green.png"
-        #~ elif status == "progress":
-            #~ self.bullet_status = "data/images/bullet_orange.png"
-        #~ elif status == "ko":
-            #~ self.bullet_status = "data/images/bullet_red.png"
-
-    #~ def set_total_users(self, total):
-        #~ if total:
-            #~ self.total_users =\
-                #~ "[b][color=#FFC300]%d[/color][/b]" % (total-1)
-        #~ else:
-            #~ self.total_users = "[b][color=#FF3200]0[/color][/b]"
-
-    #~ def start(self):
-        #~ Clock.schedule_interval(self.run, 0.1)
-        #~ Clock.schedule_interval(self.update_users, 1)
-        #~ Clock.schedule_interval(self.get_ovh_conference_infos, 30)
-    
-    #~ def run(self, *args):
-        #~ self.core.iterate()
-        
-    #~ def quit(self):
-        #~ self.do_recall = False
-        #~ self.core.terminate_all_calls()
-
-
-    #~ def update_users(self, *args):
-        #~ if self.call:
-            #~ quality = int(self.call.current_quality)
-            #~ stars = STAR_SYMBOL*(quality)+UNSTAR_SYMBOL*(5-quality)
-            #~ stars = stars + " "+self.call.user_data+"\n"
-        #~ else:
-            #~ stars = ""
-        
-        #~ self.users = "[color=#FFA500]Appels Emis[/color]\n"+stars\
-            #~ +u"\n[color=#FFA500]Appels en Conférence[/color]\n"\
-            #~ +"\n".join(self.users_list)
-        #~ self.set_total_users(len(self.users_list))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    #~ def get_ovh_conference_infos(self, *args):
-        #~ try:
-            #~ result = self.ovh_client.get(self.get_ovh_filled_request("/telephony/{billingAccount}/conference/{serviceName}/participants"))
-        #~ except:
-            #~ print "Nobody"
-        #~ else:
-            #~ changes = False
-            #~ users = []
-            #~ if result:
-                #~ for user in result:
-                    #~ user = str(user)
-                    #~ print "???", user, self.users_list
-                    #~ if not user in self.users_list:
-                        #~ changes = True
-                        #~ result = self.ovh_client.get(self.get_ovh_filled_request("/telephony/{billingAccount}/conference/{serviceName}/participants/"+user))
-                        #~ print result
-                        #~ self.users_list[user] = result["callerNumber"]
-                    #~ users.append(user)
-                
-                #~ for user in self.users_list.copy():
-                    #~ if not user in users:
-                        #~ changes = True
-                        #~ del(self.users_list[user])
-                
-                #~ if changes:
-                    #~ self.update_users()
-
-    #~ def link(self, key, obj):
-        #~ if not key in self.links:
-            #~ self.links[key] = []
-        #~ self.links[key].append(obj)
-        
-    #~ def call(self, key, value):
-        #~ if key in self.links:
-            #~ for obj in self.links[key]:
-                #~ print "call:", obj, value
-                #~ obj(value)
-    
-    #~ def global_state_changed(self, *args, **kwargs):
-        #~ self.log("global_state_changed: %r %r" % (args, kwargs))
-
-    #~ def registration_state_changed(self, core, call, state, message):
-        #~ print "ici"
-        
-        #~ self.log("registration_state_changed: " + str(state) + ": " + message)
-        
-        #~ if state == linphone.RegistrationState.Progress:
-            #~ self.set_status("progress")
-        #~ elif state == linphone.RegistrationState.Ok:
-            #~ self.set_status("ok")
-            #~ self.log("call_state_changed: " + self.proxy_cfg.normalize_phone_number("+33972584648")+"----"+str(self.core.invite("sip:0033972584648@sip3.ovh.fr")))
-        #~ elif state == linphone.RegistrationState.Failed:
-            #~ self.set_status("ko")
-
-    #~ def call_state_changed(self, core, call, state, message):
-        #~ user = call.remote_address.as_string_uri_only()
-        #~ suser = user.split("@")
-        #~ if suser[1] == "freephonie.net":
-            #~ user = suser[0][4:]
-            
-        #~ if state == linphone.CallState.IncomingReceived:
-        #~ ### INCOMING CALL
-            #~ params = core.create_call_params(call)
-            #~ #params.audio_direction = linphone.MediaDirection.RecvOnly
-            #~ self.core.accept_call_with_params(call, params)
-            #~ self.core.add_to_conference(call)
-            #~ self.add_user(user)
-            #~ self.calls[user] = call
-        #~ elif state == linphone.CallState.End or state == linphone.CallState.Error or state == linphone.CallState.Released:
-        #~ ### END OF CALL
-            #~ self.remove_user(user)
-            #~ if user in self.calls:
-                #~ del(self.calls[user])
-
-        #~ self.log("call_state_changed: " + str(state) + ": " + message)
-
-
-    #~ def log_handler(self, level, msg):
-        #~ method = getattr(logging, level)
-        #~ method(msg)
-
-    #~ def decode(self, string):
-        #~ d = base64.b64decode(string)
-        #~ final = ""
-        #~ i = 1
-        #~ for c in d:
-            #~ if i % 2:
-                #~ final = final + c
-            #~ i = i + 1
-        #~ return final
-
-    #~ def set_total_users(self, total):
-        #~ if total:
-            #~ self.total_users.text = "[b][color=#FFC300]%d[/color][/b]" % total
-        #~ else:
-            #~ self.total_users.text = "[b][color=#FF3200]0[/color][/b]"
-
-    #~ def add_user(self, user):
-        #~ self.users_list[user] = user
-        #~ self.users.text = "\n".join(self.users_list.keys())
-        #~ self.set_total_users(len(self.users_list.keys()))
-        
-    #~ def remove_user(self, user):
-        #~ if user in self.users_list:
-            #~ del(self.users_list[user])
-            #~ self.users.text = "\n".join(self.users_list.keys())
-            #~ self.set_total_users(len(self.users_list.keys()))
-    
-    
-    #~ def switch_mute(self):
-        #~ self.gain = -30 - self.gain
-        #~ self.core.playback_gain_db = self.gain
